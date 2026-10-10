@@ -1,0 +1,415 @@
+ PainterlyStrokes V1
+ Texture-aware, layered brushstrokes
+ Autodesk Maya 2025 / Arnold OSL
+
+shader PainterlyStrokesV11(
+    color InputColor = color(0.8, 0.5, 0.3),
+    string TextureFile = "",
+
+    float StrokeDensity = 32.0,
+    float StrokeLength = 0.85,
+    float StrokeWidth = 0.36,
+
+    float FlowAngle = 0.0,
+    float FlowVariation = 0.30,
+    float FlowStrength = 0.80,
+
+    float EdgeSensitivity = 3.0,
+    float ColorTolerance = 0.18,
+    float DetailProtection = 0.55,
+
+    float PaintOpacity = 1.0,
+    float PigmentVariation = 0.45,
+    float BristleStrength = 0.65,
+    float StrokeContrast = 0.85,
+
+    float TexturePreservation = 0.05,
+    float AnalysisRadius = 0.25,
+
+    output color OutColor = color(0.8, 0.5, 0.3)
+)
+{
+    float texU = u;
+    float texV = v;
+
+    float density = max(2.0, StrokeDensity);
+    float tolerance = max(0.001, ColorTolerance);
+
+    color originalColor = InputColor;
+    color resultColor = originalColor;
+
+    int hasTexture = 0;
+    if (TextureFile != "")
+        hasTexture = 1;
+
+    
+     1. LOCAL COLOR ANALYSIS
+    
+
+    float sampleStep = max(
+        0.00001,
+        AnalysisRadius / density
+    );
+
+    color colLeft = originalColor;
+    color colRight = originalColor;
+    color colUp = originalColor;
+    color colDown = originalColor;
+
+    if (hasTexture == 1)
+    {
+        colLeft = texture(
+            TextureFile,
+            texU - sampleStep,
+            texV,
+            "missingcolor", originalColor
+        );
+
+        colRight = texture(
+            TextureFile,
+            texU + sampleStep,
+            texV,
+            "missingcolor", originalColor
+        );
+
+        colUp = texture(
+            TextureFile,
+            texU,
+            texV + sampleStep,
+            "missingcolor", originalColor
+        );
+
+        colDown = texture(
+            TextureFile,
+            texU,
+            texV - sampleStep,
+            "missingcolor", originalColor
+        );
+    }
+
+    vector gradU =
+        vector(colRight) - vector(colLeft);
+
+    vector gradV =
+        vector(colUp) - vector(colDown);
+
+    float strengthU = length(gradU);
+    float strengthV = length(gradV);
+
+    float edgeAmount = clamp(
+        max(strengthU, strengthV)
+        * EdgeSensitivity,
+        0.0,
+        1.0
+    );
+
+    // Align strokes along color boundaries.
+    float edgeAngle = FlowAngle;
+
+    if (strengthU > strengthV && strengthU > 0.0001)
+    {
+        edgeAngle = FlowAngle + 1.5707963;
+    }
+    else if (strengthV > 0.0001)
+    {
+        edgeAngle = FlowAngle;
+    }
+
+    
+     2. THREE LAYERS OF PAINT
+    
+
+    for (int layer = 0; layer < 3; layer++)
+    {
+        float layerScale = 1.0;
+        float layerOpacity = 1.0;
+        float lengthScale = 1.0;
+        float widthScale = 1.0;
+
+        if (layer == 0)
+        {
+            // Broad underpainting
+            layerScale = 0.65;
+            layerOpacity = 0.75;
+            lengthScale = 1.30;
+            widthScale = 1.30;
+        }
+        else if (layer == 1)
+        {
+            // Main visible brushstrokes
+            layerScale = 1.0;
+            layerOpacity = 1.0;
+            lengthScale = 1.0;
+            widthScale = 1.0;
+        }
+        else
+        {
+            // Fine bristle details
+            layerScale = 1.80;
+            layerOpacity = 0.70;
+            lengthScale = 0.75;
+            widthScale = 0.60;
+        }
+
+        float layerDensity =
+            density * layerScale;
+
+        float px =
+            texU * layerDensity
+            + float(layer) * 13.71;
+
+        float py =
+            texV * layerDensity
+            + float(layer) * 7.31;
+
+        float gridX = floor(px);
+        float gridY = floor(py);
+
+        float bestMask = 0.0;
+        float bestPigment = 0.5;
+        float bestBristle = 1.0;
+
+        color bestColor = originalColor;
+
+        for (int oy = -1; oy <= 1; oy++)
+        {
+            for (int ox = -1; ox <= 1; ox++)
+            {
+                float cellX =
+                    gridX + float(ox);
+
+                float cellY =
+                    gridY + float(oy);
+
+                point seed = point(
+                    cellX,
+                    cellY,
+                    float(layer) * 11.0
+                );
+
+                float rndX = cellnoise(
+                    seed + point(1.0, 0.0, 0.0)
+                );
+
+                float rndY = cellnoise(
+                    seed + point(0.0, 1.0, 0.0)
+                );
+
+                float rndAngle = cellnoise(
+                    seed + point(0.0, 0.0, 2.0)
+                );
+
+                float rndPigment = cellnoise(
+                    seed + point(0.0, 0.0, 3.0)
+                );
+
+                float centerX =
+                    cellX + 0.5
+                    + (rndX - 0.5) * 0.50;
+
+                float centerY =
+                    cellY + 0.5
+                    + (rndY - 0.5) * 0.50;
+
+                float dx = px - centerX;
+                float dy = py - centerY;
+
+                float randomAngle =
+                    (rndAngle - 0.5)
+                    * 2.0 * FlowVariation;
+
+                float angle = mix(
+                    FlowAngle + randomAngle,
+                    edgeAngle + randomAngle,
+                    clamp(FlowStrength, 0.0, 1.0)
+                    * edgeAmount
+                );
+
+                float ca = cos(angle);
+                float sa = sin(angle);
+
+                float rx =
+                    dx * ca + dy * sa;
+
+                float ry =
+                    -dx * sa + dy * ca;
+
+                float localLength = max(
+                    0.03,
+                    StrokeLength
+                    * lengthScale
+                    * mix(0.75, 1.25, rndX)
+                    * mix(
+                        1.0,
+                        0.60,
+                        edgeAmount * DetailProtection
+                    )
+                );
+
+                float localWidth = max(
+                    0.015,
+                    StrokeWidth
+                    * widthScale
+                    * mix(0.75, 1.25, rndY)
+                    * mix(
+                        1.0,
+                        0.70,
+                        edgeAmount * DetailProtection
+                    )
+                );
+
+                // Tapered brush shape
+                float taper = pow(
+                    max(
+                        0.0,
+                        1.0 - abs(rx) / localLength
+                    ),
+                    0.55
+                );
+
+                float widthHere = max(
+                    0.001,
+                    localWidth * taper
+                );
+
+                float lengthMask =
+                    1.0 - smoothstep(
+                        localLength * 0.88,
+                        localLength,
+                        abs(rx)
+                    );
+
+                float widthMask =
+                    1.0 - smoothstep(
+                        widthHere * 0.80,
+                        max(widthHere, 0.001),
+                        abs(ry)
+                    );
+
+                float mask =
+                    lengthMask * widthMask;
+
+                
+                 3. COLOR-REGION PROTECTION
+               
+
+                color centerColor = originalColor;
+
+                if (hasTexture == 1)
+                {
+                    float centerU =
+                        (centerX - float(layer) * 13.71)
+                        / layerDensity;
+
+                    float centerV =
+                        (centerY - float(layer) * 7.31)
+                        / layerDensity;
+
+                    centerColor = texture(
+                        TextureFile,
+                        centerU,
+                        centerV,
+                        "missingcolor", originalColor
+                    );
+                }
+
+                float colorDifference =
+                    distance(
+                        vector(centerColor),
+                        vector(originalColor)
+                    );
+
+                float regionMatch =
+                    1.0 - smoothstep(
+                        tolerance * 0.50,
+                        tolerance * 1.50,
+                        colorDifference
+                    );
+
+                // Softer rejection to keep strokes visible.
+                mask *= mix(
+                    1.0,
+                    regionMatch,
+                    0.65
+                );
+
+                
+                 4. BRISTLE TEXTURE
+                
+
+                float grooves =
+                    0.5 + 0.5 * sin(
+                        ry / max(localWidth, 0.001)
+                        * 55.0
+                        + rndX * 17.0
+                    );
+
+                float grain = noise(
+                    point(
+                        rx * 22.0 + cellX,
+                        ry * 12.0 + cellY,
+                        float(layer) * 5.0
+                    )
+                );
+
+                float bristle = mix(
+                    1.0,
+                    0.45 + 0.55 * grooves * grain,
+                    clamp(BristleStrength, 0.0, 1.0)
+                );
+
+                if (mask > bestMask)
+                {
+                    bestMask = mask;
+                    bestPigment = rndPigment;
+                    bestBristle = bristle;
+                    bestColor = centerColor;
+                }
+            }
+        }
+
+       
+        5. APPLY PAINT LAYER
+        
+
+        float pigmentShift =
+            (bestPigment - 0.5)
+            * 2.0 * PigmentVariation;
+
+        color strokePigment =
+            bestColor
+            * (1.0 + pigmentShift * StrokeContrast);
+
+        strokePigment *= bestBristle;
+
+        float detailFactor =
+            1.0 - edgeAmount
+            * clamp(DetailProtection, 0.0, 1.0)
+            * 0.45;
+
+        float opacity = clamp(
+            bestMask
+            * PaintOpacity
+            * layerOpacity
+            * detailFactor,
+            0.0,
+            1.0
+        );
+
+        resultColor = mix(
+            resultColor,
+            strokePigment,
+            opacity
+        );
+    }
+
+
+    6. FINAL TEXTURE PRESERVATION
+    
+
+    OutColor = mix(
+        resultColor,
+        originalColor,
+        clamp(TexturePreservation, 0.0, 1.0)
+    );
+}
