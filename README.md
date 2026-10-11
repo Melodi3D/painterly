@@ -16,7 +16,7 @@ My goals for this project
 
 • e ✓
 
-# N — RigUp Development
+# Fur Texture assignment — Painterly Development
 <p align="center">
   <img src="media/workinprogresspainterly.png" width="2000" alt="workinprogresspainterly">
 </p>
