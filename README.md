@@ -1,6 +1,6 @@
 
 <p align="center">
-  <img src="painterlyexample.png" width="250" alt="painterly Logo">
+  <img src="painterlyexample.png" width="900" alt="painterly Logo">
 </p>
 
 # painterly
