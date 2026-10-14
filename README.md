@@ -1,10 +1,9 @@
+# painterly
+A procedural painterly fur and brushstroke generator for Autodesk Maya, developed in Python. Converts textured polygon meshes into stylized, hand-painted surfaces using layered geometry while preserving the original model's texture.
 
 <p align="center">
   <img src="painterlyexample.png" width="900" alt="painterly Logo">
 </p>
-
-# painterly
-A procedural painterly fur and brushstroke generator for Autodesk Maya, developed in Python. Converts textured polygon meshes into stylized, hand-painted surfaces using layered geometry while preserving the original model's texture.
 
 # Software Used
 Autodesk Maya 2025 • Python • PySide6 • Qt Designer • Adobe Photoshop
