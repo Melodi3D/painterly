@@ -12,6 +12,7 @@ Autodesk Maya 2025 • Python • PySide6 • Qt Designer • Adobe Photoshop
 # Goals
 My goals for this project 
 # Planned Features:
+# Got to fill this in
 •  ✓
 
 •  ✓
